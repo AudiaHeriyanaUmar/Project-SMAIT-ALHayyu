@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AbsensiSiswa extends Model
 {
@@ -11,13 +13,23 @@ class AbsensiSiswa extends Model
 
     protected $fillable = [
         'jurnal_guru_id',
-        'nama_siswa',
+        'siswa_id',
         'status',
-        'keterangan'
+        'keterangan',
     ];
 
-    public function jurnal()
+    public function jurnal(): BelongsTo
     {
-        return $this->belongsTo(JurnalGuru::class);
+        return $this->belongsTo(JurnalGuru::class, 'jurnal_guru_id');
+    }
+
+    public function siswa(): BelongsTo
+    {
+        return $this->belongsTo(Siswa::class);
+    }
+
+    public function corrections(): HasMany
+    {
+        return $this->hasMany(AttendanceCorrection::class);
     }
 }

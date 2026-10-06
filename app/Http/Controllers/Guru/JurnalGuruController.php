@@ -6,8 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\JurnalGuru;
 use App\Models\Kelas;
 use App\Models\MataPelajaran;
+use App\Models\Siswa;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class JurnalGuruController extends Controller
 {
@@ -28,6 +32,13 @@ class JurnalGuruController extends Controller
         ];
 
         $jurnals = JurnalGuru::with(['kelas', 'mataPelajaran'])
+            ->withCount([
+                'absensi',
+                'absensi as hadir_count' => fn ($query) => $query->where('status', 'hadir'),
+                'absensi as izin_count' => fn ($query) => $query->where('status', 'izin'),
+                'absensi as sakit_count' => fn ($query) => $query->where('status', 'sakit'),
+                'absensi as alpa_count' => fn ($query) => $query->where('status', 'alpa'),
+            ])
             ->where('user_id', $guruId)
             ->latest('tanggal')
             ->latest('id')
@@ -40,10 +51,11 @@ class JurnalGuruController extends Controller
     {
         $this->ensureGuruAccess();
 
-        $kelasList = Kelas::all();
-        $mapelList = MataPelajaran::all();
-        
-        return view('guru.jurnal.create', compact('kelasList', 'mapelList'));
+        $kelasList = Kelas::query()->orderBy('nama_kelas')->get();
+        $mapelList = MataPelajaran::query()->orderBy('nama_mapel')->get();
+        $siswaList = Siswa::query()->with('kelas')->orderBy('nama_lengkap')->get();
+
+        return view('guru.jurnal.create', compact('kelasList', 'mapelList', 'siswaList'));
     }
 
     public function store(Request $request)
@@ -57,20 +69,52 @@ class JurnalGuruController extends Controller
             'mata_pelajaran_id' => 'required|exists:mata_pelajarans,id',
             'materi_pembelajaran' => 'required|string',
             'catatan_kegiatan' => 'nullable|string',
+            'absensi' => ['required', 'array', 'min:1'],
+            'absensi.*.status' => ['required', Rule::in(['hadir', 'izin', 'sakit', 'alpa'])],
+            'absensi.*.keterangan' => ['nullable', 'string', 'max:255'],
         ]);
 
-        JurnalGuru::create([
-            'user_id' => Auth::id(),
-            'tanggal' => $validated['tanggal'],
-            'jam_ke' => $validated['jam_ke'],
-            'kelas_id' => $validated['kelas_id'],
-            'mata_pelajaran_id' => $validated['mata_pelajaran_id'],
-            'materi_pembelajaran' => $validated['materi_pembelajaran'],
-            'catatan_kegiatan' => $validated['catatan_kegiatan'] ?? null,
-            'status_monitoring' => 'pending'
-        ]);
+        $expectedStudentIds = Siswa::query()
+            ->where('kelas_id', $validated['kelas_id'])
+            ->pluck('id')
+            ->map(fn ($id) => (string) $id)
+            ->sort()
+            ->values()
+            ->all();
+        $submittedStudentIds = collect(array_keys($validated['absensi']))
+            ->map(fn ($id) => (string) $id)
+            ->sort()
+            ->values()
+            ->all();
 
-        return redirect()->route('guru.jurnal.index')->with('success', 'Jurnal mengajar berhasil dikirim secara real-time.');
+        if ($expectedStudentIds === [] || $expectedStudentIds !== $submittedStudentIds) {
+            throw ValidationException::withMessages([
+                'absensi' => 'Absensi harus diisi untuk seluruh siswa di kelas yang dipilih.',
+            ]);
+        }
+
+        DB::transaction(function () use ($validated): void {
+            $jurnal = JurnalGuru::query()->create([
+                'user_id' => Auth::id(),
+                'tanggal' => $validated['tanggal'],
+                'jam_ke' => $validated['jam_ke'],
+                'kelas_id' => $validated['kelas_id'],
+                'mata_pelajaran_id' => $validated['mata_pelajaran_id'],
+                'materi_pembelajaran' => $validated['materi_pembelajaran'],
+                'catatan_kegiatan' => $validated['catatan_kegiatan'] ?? null,
+                'status_monitoring' => 'pending',
+            ]);
+
+            $jurnal->absensi()->createMany(
+                collect($validated['absensi'])->map(fn (array $attendance, string $studentId) => [
+                    'siswa_id' => $studentId,
+                    'status' => $attendance['status'],
+                    'keterangan' => $attendance['keterangan'] ?? null,
+                ])->all()
+            );
+        });
+
+        return redirect()->route('guru.jurnal.index')->with('success', 'Jurnal dan absensi berhasil dikirim untuk ditinjau.');
     }
 
     private function ensureGuruAccess(): void

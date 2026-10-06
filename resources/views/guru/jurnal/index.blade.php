@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#104c37">
     <title>Jurnal Guru | SMAIT Al-Hayyu</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -94,6 +95,7 @@
                             <th scope="col">Kelas</th>
                             <th scope="col">Mata pelajaran</th>
                             <th scope="col">Materi</th>
+                            <th scope="col">Rekap absensi</th>
                             <th scope="col">Status</th>
                         </tr>
                     </thead>
@@ -105,6 +107,12 @@
                                 <td>{{ $jurnal->kelas->nama_kelas ?? 'Data tidak tersedia' }}</td>
                                 <td>{{ $jurnal->mataPelajaran->nama_mapel ?? 'Data tidak tersedia' }}</td>
                                 <td>{{ \Illuminate\Support\Str::limit($jurnal->materi_pembelajaran, 55) }}</td>
+                                <td class="text-nowrap small">
+                                    <span class="text-success fw-semibold">{{ $jurnal->hadir_count }} hadir</span><br>
+                                    <span class="portal-muted">
+                                        Izin {{ $jurnal->izin_count }} · Sakit {{ $jurnal->sakit_count }} · Alpa {{ $jurnal->alpa_count }}
+                                    </span>
+                                </td>
                                 <td>
                                     @if($jurnal->status_monitoring === 'verified')
                                         <span class="badge rounded-pill text-bg-success">Terverifikasi</span>
@@ -115,7 +123,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="text-center py-5">
+                                <td colspan="7" class="text-center py-5">
                                     <p class="fw-bold mb-1">Belum ada jurnal mengajar</p>
                                     <p class="portal-muted small mb-3">Mulai dengan mencatat kegiatan pembelajaran Anda.</p>
                                     <a href="{{ route('guru.jurnal.create') }}" class="btn portal-btn-primary rounded-pill px-4">Buat jurnal pertama</a>
@@ -132,5 +140,6 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <x-account-activity-tracker />
 </body>
 </html>

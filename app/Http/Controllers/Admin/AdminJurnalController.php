@@ -11,9 +11,6 @@ class AdminJurnalController extends Controller
     // Halaman Monitoring
     public function index(Request $request)
     {
-        // Proteksi agar hanya admin yang bisa akses
-        if (auth()->user()->role !== 'admin') abort(403, 'Akses Ditolak');
-
         $filters = $request->validate([
             'bulan' => ['nullable', 'integer', 'between:1,12'],
             'status' => ['nullable', 'in:pending,verified'],
@@ -42,8 +39,6 @@ class AdminJurnalController extends Controller
     // Fitur Evaluasi (Verifikasi Jurnal)
     public function verify($id)
     {
-        if (auth()->user()->role !== 'admin') abort(403);
-
         $jurnal = JurnalGuru::findOrFail($id);
         $jurnal->update(['status_monitoring' => 'verified']);
 
@@ -53,9 +48,7 @@ class AdminJurnalController extends Controller
     // Fitur Pengarsipan (Cetak Laporan)
     public function cetak(Request $request)
     {
-        if (auth()->user()->role !== 'admin') abort(403);
-
-        $query = JurnalGuru::with(['user', 'kelas', 'mataPelajaran'])->orderBy('tanggal', 'asc');
+        $query = JurnalGuru::with(['user', 'kelas', 'mataPelajaran', 'absensi'])->orderBy('tanggal', 'asc');
 
         if ($request->filled('bulan')) {
             $query->whereMonth('tanggal', $request->bulan);

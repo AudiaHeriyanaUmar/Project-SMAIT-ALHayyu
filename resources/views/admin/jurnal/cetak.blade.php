@@ -31,7 +31,8 @@
                 <th>Kelas</th>
                 <th>Mata Pelajaran</th>
                 <th>Materi Pembelajaran</th>
-                <th>Catatan / Absensi</th>
+                <th>Catatan pembelajaran</th>
+                <th>Rekap absensi</th>
                 <th>Status</th>
             </tr>
         </thead>
@@ -45,6 +46,13 @@
                     <td>{{ $jurnal->mataPelajaran->nama_mapel ?? '-' }}</td>
                     <td>{{ $jurnal->materi_pembelajaran }}</td>
                     <td>{{ $jurnal->catatan_kegiatan ?? '-' }}</td>
+                    <td>
+                        @php($attendanceCounts = $jurnal->absensi->countBy('status'))
+                        Hadir: {{ $attendanceCounts['hadir'] ?? 0 }}<br>
+                        Izin: {{ $attendanceCounts['izin'] ?? 0 }}<br>
+                        Sakit: {{ $attendanceCounts['sakit'] ?? 0 }}<br>
+                        Alpa: {{ $attendanceCounts['alpa'] ?? 0 }}
+                    </td>
                     <td>{{ $jurnal->status_monitoring === 'verified' ? 'Verified' : 'Pending' }}</td>
                 </tr>
             @endforeach

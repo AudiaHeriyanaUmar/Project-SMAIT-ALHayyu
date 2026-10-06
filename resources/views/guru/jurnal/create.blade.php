@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#104c37">
     <title>Buat Jurnal | SMAIT Al-Hayyu</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -93,6 +94,67 @@
                         @error('catatan_kegiatan')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
 
+                    <section class="mb-4">
+                        <div class="d-flex flex-column flex-sm-row justify-content-between gap-1 mb-2">
+                            <div>
+                                <h2 class="h5 fw-bold mb-1">Absensi siswa</h2>
+                                <p class="portal-muted small mb-0">Pilih status setiap siswa. Tidak ada status yang dipilih otomatis.</p>
+                            </div>
+                            <span class="badge rounded-pill text-bg-light align-self-start">{{ $siswaList->count() }} siswa terdaftar</span>
+                        </div>
+                        @error('absensi')
+                            <div class="alert alert-danger rounded-4 py-2">{{ $message }}</div>
+                        @enderror
+                        <div class="table-responsive portal-card shadow-none">
+                            <table class="table portal-table align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Nama siswa</th>
+                                        <th scope="col" style="min-width:160px">Kehadiran</th>
+                                        <th scope="col" style="min-width:220px">Keterangan (opsional)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="attendance-roster">
+                                    @foreach($siswaList as $siswa)
+                                        @php($oldAttendance = old("absensi.{$siswa->id}", []))
+                                        <tr data-kelas-id="{{ $siswa->kelas_id }}" hidden>
+                                            <td>
+                                                <div class="fw-semibold">{{ $siswa->nama_lengkap }}</div>
+                                                <div class="portal-muted small">{{ $siswa->kelas->nama_kelas ?? '' }}</div>
+                                            </td>
+                                            <td>
+                                                <label class="visually-hidden" for="attendance-{{ $siswa->id }}">Status {{ $siswa->nama_lengkap }}</label>
+                                                <select id="attendance-{{ $siswa->id }}" name="absensi[{{ $siswa->id }}][status]"
+                                                        class="form-select portal-form-control @error("absensi.{$siswa->id}.status") is-invalid @enderror"
+                                                        disabled>
+                                                    <option value="">Pilih status</option>
+                                                    <option value="hadir" @selected(($oldAttendance['status'] ?? '') === 'hadir')>Hadir</option>
+                                                    <option value="izin" @selected(($oldAttendance['status'] ?? '') === 'izin')>Izin</option>
+                                                    <option value="sakit" @selected(($oldAttendance['status'] ?? '') === 'sakit')>Sakit</option>
+                                                    <option value="alpa" @selected(($oldAttendance['status'] ?? '') === 'alpa')>Alpa</option>
+                                                </select>
+                                                @error("absensi.{$siswa->id}.status")<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                            </td>
+                                            <td>
+                                                <label class="visually-hidden" for="attendance-note-{{ $siswa->id }}">Keterangan {{ $siswa->nama_lengkap }}</label>
+                                                <input id="attendance-note-{{ $siswa->id }}" type="text"
+                                                       name="absensi[{{ $siswa->id }}][keterangan]"
+                                                       value="{{ $oldAttendance['keterangan'] ?? '' }}"
+                                                       class="form-control portal-form-control" placeholder="Contoh: izin keluarga" disabled>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                    <tr id="attendance-empty-state">
+                                        <td colspan="3" class="text-center portal-muted py-4">
+                                            Pilih kelas untuk menampilkan daftar siswanya.
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="portal-muted small mt-2 mb-0">Pastikan seluruh siswa pada kelas terpilih mendapat status sebelum jurnal dikirim.</p>
+                    </section>
+
                     <div class="d-flex flex-column flex-sm-row justify-content-end gap-2">
                         <a href="{{ route('guru.jurnal.index') }}" class="btn portal-btn-outline rounded-pill px-4 py-2">Batal</a>
                         <button type="submit" class="btn portal-btn-primary rounded-pill px-4 py-2">Kirim jurnal untuk verifikasi</button>
@@ -101,5 +163,34 @@
             </section>
         </div>
     </main>
+    <script>
+        (() => {
+            const classSelect = document.getElementById('kelas_id');
+            const rows = Array.from(document.querySelectorAll('#attendance-roster tr[data-kelas-id]'));
+            const emptyState = document.getElementById('attendance-empty-state');
+            const updateRoster = () => {
+                const selectedClass = classSelect.value;
+                const matchingRows = rows.filter((row) => row.dataset.kelasId === selectedClass);
+
+                rows.forEach((row) => {
+                    const active = row.dataset.kelasId === selectedClass && selectedClass !== '';
+                    row.hidden = !active;
+                    row.querySelectorAll('select, input').forEach((field) => {
+                        field.disabled = !active;
+                        field.required = active && field.tagName === 'SELECT';
+                    });
+                });
+
+                emptyState.hidden = matchingRows.length > 0;
+                emptyState.querySelector('td').textContent = selectedClass
+                    ? 'Belum ada siswa terdaftar di kelas ini.'
+                    : 'Pilih kelas untuk menampilkan daftar siswanya.';
+            };
+
+            classSelect.addEventListener('change', updateRoster);
+            updateRoster();
+        })();
+    </script>
+    <x-account-activity-tracker />
 </body>
 </html>

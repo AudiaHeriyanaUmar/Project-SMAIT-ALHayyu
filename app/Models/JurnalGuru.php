@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class JurnalGuru extends Model
 {
@@ -22,10 +23,10 @@ class JurnalGuru extends Model
 
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class)->withTrashed();
     }
 
-    public function absensi()
+    public function absensi(): HasMany
     {
         return $this->hasMany(AbsensiSiswa::class);
     }

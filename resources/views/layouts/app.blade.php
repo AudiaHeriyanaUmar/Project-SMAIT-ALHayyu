@@ -32,5 +32,6 @@
                 {{ $slot }}
             </main>
         </div>
+        <x-account-activity-tracker />
     </body>
 </html>

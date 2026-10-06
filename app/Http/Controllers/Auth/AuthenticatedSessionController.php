@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Services\AccountActivityTracker;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -22,11 +23,12 @@ class AuthenticatedSessionController extends Controller
     /**
      * Handle an incoming authentication request.
      */
-    public function store(LoginRequest $request): RedirectResponse
+    public function store(LoginRequest $request, AccountActivityTracker $activityTracker): RedirectResponse
     {
         $request->authenticate();
 
         $request->session()->regenerate();
+        $activityTracker->start($request->user(), $request->session()->getId());
 
         return match ($request->user()->role) {
             'admin' => redirect()->route('admin.dashboard'),
@@ -38,8 +40,10 @@ class AuthenticatedSessionController extends Controller
     /**
      * Destroy an authenticated session.
      */
-    public function destroy(Request $request): RedirectResponse
+    public function destroy(Request $request, AccountActivityTracker $activityTracker): RedirectResponse
     {
+        $activityTracker->end($request->user(), $request->session()->getId());
+
         Auth::guard('web')->logout();
 
         $request->session()->invalidate();

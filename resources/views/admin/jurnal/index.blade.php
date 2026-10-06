@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#104c37">
     <title>Dashboard Monitoring | SMAIT Al-Hayyu</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -30,6 +31,8 @@
             <div class="collapse navbar-collapse" id="adminNavigation">
                 <div class="navbar-nav ms-auto align-items-lg-center gap-lg-3">
                     <a class="nav-link active" href="{{ route('admin.dashboard') }}">Monitoring jurnal</a>
+                    <a class="nav-link" href="{{ route('admin.absensi.index') }}">Rekap absensi</a>
+                    <a class="nav-link" href="{{ route('admin.accounts.index') }}">Kelola akun</a>
                     <span class="nav-link d-none d-lg-inline">{{ auth()->user()->name }}</span>
                     <form method="POST" action="{{ route('logout') }}" class="ms-lg-2">
                         @csrf
@@ -174,5 +177,6 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <x-account-activity-tracker />
 </body>
 </html>
