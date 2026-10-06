@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SpmbController;
 use App\Http\Controllers\Guru\JurnalGuruController;
+use App\Http\Controllers\Admin\AdminJurnalController;
 
 // 1. Halaman Utama (Website Sekolah)
 Route::get('/', function () {
@@ -13,11 +14,6 @@ Route::get('/', function () {
 // 2. Halaman SPMB (Bisa diakses publik)
 Route::get('/spmb', [SpmbController::class, 'index'])->name('spmb.index');
 Route::post('/spmb/daftar', [SpmbController::class, 'store'])->name('spmb.store');
-
-// 3. Dashboard Bawaan Breeze (Setelah Login)
-Route::get('/dashboard', function () {
-    return view('dashboard');
-})->middleware(['auth', 'verified'])->name('dashboard');
 
 // 4. Fitur Jurnal Guru (Hanya bisa diakses jika sudah login)
 Route::middleware(['auth'])->prefix('guru')->name('guru.')->group(function () {
@@ -31,6 +27,29 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+});
+
+// Arahkan pengguna berdasarkan peran setelah login.
+Route::get('/dashboard', function () {
+    $role = auth()->user()->role;
+
+    if ($role === 'guru') {
+        return redirect()->route('guru.jurnal.index');
+    }
+
+    if ($role === 'admin') {
+        return redirect()->route('admin.dashboard');
+    }
+
+    return view('dashboard');
+})->middleware(['auth', 'verified'])->name('dashboard');
+
+// Rute Monitoring Admin / Kepala Sekolah
+Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/dashboard', [AdminJurnalController::class, 'index'])->name('dashboard');
+    Route::get('/jurnal', [AdminJurnalController::class, 'index'])->name('jurnal.index');
+    Route::post('/jurnal/{id}/verify', [AdminJurnalController::class, 'verify'])->name('jurnal.verify');
+    Route::get('/jurnal/cetak', [AdminJurnalController::class, 'cetak'])->name('jurnal.cetak');
 });
 
 require __DIR__.'/auth.php';

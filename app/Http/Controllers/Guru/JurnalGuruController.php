@@ -13,13 +13,33 @@ class JurnalGuruController extends Controller
 {
     public function index()
     {
-        // Mengambil data jurnal beserta relasi kelas dan mata pelajarannya
-        $jurnals = JurnalGuru::with(['kelas', 'mataPelajaran'])->where('user_id', Auth::id())->latest()->get();
-        return view('guru.jurnal.index', compact('jurnals'));
+        $this->ensureGuruAccess();
+
+        $guruId = Auth::id();
+        $ringkasanQuery = JurnalGuru::where('user_id', $guruId);
+        $ringkasan = [
+            'total' => (clone $ringkasanQuery)->count(),
+            'pending' => (clone $ringkasanQuery)->where('status_monitoring', 'pending')->count(),
+            'verified' => (clone $ringkasanQuery)->where('status_monitoring', 'verified')->count(),
+            'bulan_ini' => (clone $ringkasanQuery)
+                ->whereMonth('tanggal', now()->month)
+                ->whereYear('tanggal', now()->year)
+                ->count(),
+        ];
+
+        $jurnals = JurnalGuru::with(['kelas', 'mataPelajaran'])
+            ->where('user_id', $guruId)
+            ->latest('tanggal')
+            ->latest('id')
+            ->paginate(10);
+
+        return view('guru.jurnal.index', compact('jurnals', 'ringkasan'));
     }
 
     public function create()
     {
+        $this->ensureGuruAccess();
+
         $kelasList = Kelas::all();
         $mapelList = MataPelajaran::all();
         
@@ -28,6 +48,8 @@ class JurnalGuruController extends Controller
 
     public function store(Request $request)
     {
+        $this->ensureGuruAccess();
+
         $validated = $request->validate([
             'tanggal' => 'required|date',
             'jam_ke' => 'required|string',
@@ -49,5 +71,10 @@ class JurnalGuruController extends Controller
         ]);
 
         return redirect()->route('guru.jurnal.index')->with('success', 'Jurnal mengajar berhasil dikirim secara real-time.');
+    }
+
+    private function ensureGuruAccess(): void
+    {
+        abort_unless(Auth::user()->role === 'guru', 403, 'Akses ditolak.');
     }
 }
