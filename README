@@ -1,8 +1,0 @@
-UPDATE SUMMARY
-Dashboard berdasarkan role: Login admin diarahkan ke dashboard monitoring admin, guru ke jurnal guru, dan calon siswa ke dashboard umum. Tujuan login tidak lagi dapat tertimpa oleh URL tujuan lama.
-Dashboard monitoring jurnal: Admin dapat melihat ringkasan jurnal, memfilter dan memverifikasi jurnal, serta mencetak laporan. Halaman admin dibatasi berdasarkan role.
-Penyegaran tampilan: Landing page, dashboard guru, dan dashboard admin diperbarui dengan tampilan responsif. Form jurnal guru juga diperbaiki agar sesuai dengan data yang diwajibkan backend.
-Account management admin: Admin dapat menambah akun, mengubah informasi dan role, mereset password, serta mengarsipkan akun. Akun admin sendiri dan admin terakhir dilindungi dari penghapusan atau penurunan role.
-Pemantauan aktivitas akun: Sistem mencatat sesi, aktivitas terakhir, status online, dan waktu aktif hari ini serta tujuh hari terakhir. Waktu idle dibatasi 15 menit.
-Absensi per pertemuan: Guru mencatat status setiap siswa—hadir, izin, sakit, atau alpa—bersamaan dengan jurnal. Server memvalidasi daftar siswa agar lengkap dan sesuai kelas.
-Rekap absensi admin: Admin dapat memfilter dan mencetak rekap. Koreksi absensi memerlukan alasan dan tersimpan dalam riwayat audit.
