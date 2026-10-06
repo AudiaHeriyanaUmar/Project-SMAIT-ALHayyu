@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\AdminAuditLogger;
 use App\Services\AccountActivityTracker;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -84,7 +85,7 @@ class AccountManagementController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, AdminAuditLogger $auditLogger): RedirectResponse
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -100,6 +101,11 @@ class AccountManagementController extends Controller
             'password' => Hash::make($validated['password']),
         ]);
         $user->forceFill(['email_verified_at' => now()])->save();
+        $auditLogger->record($request->user(), 'account.created', "Akun {$user->email} dibuat.", $user, [
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role,
+        ]);
 
         return redirect()->route('admin.accounts.index')->with('success', 'Akun berhasil ditambahkan.');
     }
@@ -113,7 +119,7 @@ class AccountManagementController extends Controller
         ]);
     }
 
-    public function update(Request $request, User $user): RedirectResponse
+    public function update(Request $request, User $user, AdminAuditLogger $auditLogger): RedirectResponse
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -121,6 +127,7 @@ class AccountManagementController extends Controller
             'role' => ['required', Rule::in(self::ROLES)],
         ]);
 
+        $oldAccount = $user->only(['name', 'email', 'role']);
         $updated = DB::transaction(function () use ($request, $user, $validated): string {
             $adminIds = User::query()
                 ->where('role', 'admin')
@@ -150,6 +157,11 @@ class AccountManagementController extends Controller
             return back()->withErrors(['role' => 'Role akun admin terakhir tidak dapat diubah.'])->withInput();
         }
 
+        $auditLogger->record($request->user(), 'account.updated', "Informasi akun {$user->email} diperbarui.", $user, [
+            'before' => $oldAccount,
+            'after' => $user->only(['name', 'email', 'role']),
+        ]);
+
         return redirect()->route('admin.accounts.index')->with('success', 'Informasi akun berhasil diperbarui.');
     }
 
@@ -158,18 +170,24 @@ class AccountManagementController extends Controller
         return view('admin.accounts.password', ['account' => $user]);
     }
 
-    public function updatePassword(Request $request, User $user): RedirectResponse
+    public function updatePassword(Request $request, User $user, AdminAuditLogger $auditLogger): RedirectResponse
     {
         $validated = $request->validate([
             'password' => ['required', 'confirmed', Password::min(8)],
         ]);
 
         $user->update(['password' => Hash::make($validated['password'])]);
+        $auditLogger->record($request->user(), 'account.password_changed', "Password akun {$user->email} diubah.", $user);
 
         return redirect()->route('admin.accounts.index')->with('success', "Password akun {$user->name} berhasil diubah.");
     }
 
-    public function destroy(User $user, AccountActivityTracker $activityTracker): RedirectResponse
+    public function destroy(
+        Request $request,
+        User $user,
+        AccountActivityTracker $activityTracker,
+        AdminAuditLogger $auditLogger,
+    ): RedirectResponse
     {
         if (request()->user()->is($user)) {
             return back()->withErrors(['account' => 'Anda tidak dapat menghapus akun sendiri.']);
@@ -197,6 +215,12 @@ class AccountManagementController extends Controller
         if (! $canDelete) {
             return back()->withErrors(['account' => 'Akun admin terakhir tidak dapat dihapus.']);
         }
+
+        $auditLogger->record($request->user(), 'account.archived', "Akun {$user->email} diarsipkan.", $user, [
+            'name' => $user->name,
+            'email' => $user->email,
+            'role' => $user->role,
+        ]);
 
         return redirect()->route('admin.accounts.index')->with('success', "Akun {$user->name} berhasil dihapus.");
     }

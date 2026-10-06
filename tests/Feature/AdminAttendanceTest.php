@@ -5,7 +5,9 @@ namespace Tests\Feature;
 use App\Models\AbsensiSiswa;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AdminAttendanceTest extends TestCase
@@ -112,6 +114,8 @@ class AdminAttendanceTest extends TestCase
             ->get(route('admin.absensi.index'))
             ->assertForbidden();
         $this->get(route('admin.absensi.cetak'))->assertForbidden();
+        $this->get(route('admin.absensi.report'))->assertForbidden();
+        $this->get(route('admin.absensi.report.export'))->assertForbidden();
         $this->put(route('admin.absensi.correct', $attendanceId), [
             'status' => 'alpa',
             'alasan' => 'Percobaan tanpa wewenang',
@@ -136,6 +140,100 @@ class AdminAttendanceTest extends TestCase
 
         $this->expectException(\Illuminate\Database\QueryException::class);
         DB::table('absensi_siswas')->insert($attributes);
+    }
+
+    public function test_monthly_attendance_report_calculates_presence_and_repeated_absence_and_exports_csv(): void
+    {
+        [$admin, $teacher, $classId, $subjectId, $studentId, $journalId] = $this->createAttendanceFixture();
+        DB::table('absensi_siswas')->insert([
+            'jurnal_guru_id' => $journalId,
+            'siswa_id' => $studentId,
+            'status' => 'alpa',
+            'keterangan' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        foreach (['2026-10-08', '2026-10-09'] as $date) {
+            $extraJournalId = DB::table('jurnal_gurus')->insertGetId([
+                'user_id' => $teacher->id,
+                'tanggal' => $date,
+                'jam_ke' => '1',
+                'kelas_id' => $classId,
+                'mata_pelajaran_id' => $subjectId,
+                'materi_pembelajaran' => 'Materi',
+                'catatan_kegiatan' => null,
+                'status_monitoring' => 'verified',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            DB::table('absensi_siswas')->insert([
+                'jurnal_guru_id' => $extraJournalId,
+                'siswa_id' => $studentId,
+                'status' => 'alpa',
+                'keterangan' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        $filters = [
+            'periode' => 'bulanan',
+            'tahun' => 2026,
+            'bulan' => 10,
+            'kelas_id' => $classId,
+        ];
+        $response = $this->actingAs($admin)
+            ->get(route('admin.absensi.report', $filters))
+            ->assertOk()
+            ->assertViewHas('summary', fn (array $summary) => $summary['alpa'] === 3
+                && $summary['alpa_berulang'] === 1)
+            ->assertViewHas('rows', fn ($rows) => $rows->first()->alpa === 3);
+
+        $this->assertEquals(0.0, $response->viewData('rows')->first()->percentage);
+
+        $this->get(route('admin.absensi.report', [
+            'periode' => 'semester',
+            'tahun' => 2026,
+            'semester' => 2,
+            'kelas_id' => $classId,
+        ]))->assertOk()->assertViewHas('summary', fn (array $summary) => $summary['alpa'] === 3);
+
+        $this->get(route('admin.absensi.report.export', $filters))->assertOk()->assertDownload('laporan-absensi.csv');
+    }
+
+    public function test_corrections_to_verified_journals_require_private_supporting_evidence(): void
+    {
+        [$admin, , , , $studentId, $journalId] = $this->createAttendanceFixture();
+        DB::table('jurnal_gurus')->where('id', $journalId)->update(['status_monitoring' => 'verified']);
+        $attendanceId = DB::table('absensi_siswas')->insertGetId([
+            'jurnal_guru_id' => $journalId,
+            'siswa_id' => $studentId,
+            'status' => 'alpa',
+            'keterangan' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Storage::fake('local');
+        $this->actingAs($admin)
+            ->from(route('admin.absensi.index'))
+            ->put(route('admin.absensi.correct', $attendanceId), [
+                'status' => 'izin',
+                'alasan' => 'Surat izin telah diperiksa.',
+            ])
+            ->assertRedirect(route('admin.absensi.index'))
+            ->assertSessionHasErrors('bukti');
+
+        $this->put(route('admin.absensi.correct', $attendanceId), [
+            'status' => 'izin',
+            'alasan' => 'Surat izin telah diperiksa.',
+            'bukti' => UploadedFile::fake()->create('surat-izin.pdf', 100, 'application/pdf'),
+        ])->assertRedirect();
+
+        $correction = \App\Models\AttendanceCorrection::query()->firstOrFail();
+        Storage::disk('local')->assertExists($correction->evidence_path);
+        $this->get(route('admin.absensi.evidence', $correction))->assertOk();
     }
 
     private function createAttendanceFixture(): array

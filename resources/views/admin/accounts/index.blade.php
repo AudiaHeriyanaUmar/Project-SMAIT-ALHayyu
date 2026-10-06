@@ -20,7 +20,12 @@
             <div class="collapse navbar-collapse" id="accountNavigation">
                 <div class="navbar-nav ms-auto align-items-lg-center gap-lg-3">
                     <a class="nav-link" href="{{ route('admin.dashboard') }}">Monitoring jurnal</a>
+                    <a class="nav-link" href="{{ route('admin.absensi.index') }}">Rekap absensi</a>
+                    <a class="nav-link" href="{{ route('admin.students.index') }}">Kelola siswa</a>
+                    <a class="nav-link" href="{{ route('admin.classes.index') }}">Kelola kelas</a>
                     <a class="nav-link active" href="{{ route('admin.accounts.index') }}">Kelola akun</a>
+                    <a class="nav-link" href="{{ route('admin.audit.index') }}">Audit</a>
+                    <a class="nav-link" href="{{ route('admin.backup.index') }}">Backup</a>
                     <span class="nav-link d-none d-lg-inline">{{ auth()->user()->name }}</span>
                     <form method="POST" action="{{ route('logout') }}" class="ms-lg-2">
                         @csrf
@@ -80,7 +85,7 @@
                 <div class="d-flex flex-column flex-xl-row justify-content-between align-items-xl-center gap-3">
                     <div>
                         <h2 class="h5 fw-bold mb-1">Daftar akun</h2>
-                        <p class="portal-muted small mb-0">Waktu aktif menjumlahkan durasi aktivitas selama 7 hari terakhir.</p>
+                        <p class="portal-muted small mb-0">Jam aktif harian diringkas terus; detail sesi dan audit tindakan disimpan selama 14 hari.</p>
                     </div>
                     <form action="{{ route('admin.accounts.index') }}" method="GET" class="row g-2">
                         <div class="col-8 col-sm-auto">

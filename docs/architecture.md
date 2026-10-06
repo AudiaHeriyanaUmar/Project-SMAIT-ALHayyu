@@ -41,9 +41,16 @@ flowchart LR
         AttendanceController["AdminAttendanceController"]
         AttendanceViews["Rekap absensi / filter / cetak"]
         CorrectionAudit["Koreksi status<br/>wajib alasan + jejak admin"]
+        StudentController["StudentManagementController"]
+        StudentViews["Kelola roster<br/>pratinjau CSV / tambah / edit / arsip"]
+        ClassController["ClassManagementController"]
+        ClassViews["Kelola kelas / promosi siswa<br/>kelas tujuan wajib kosong"]
         AccountController["AccountManagementController"]
         AccountViews["Kelola akun<br/>tambah / edit / hapus / password"]
         ActivityView["Status online / aktivitas terakhir<br/>jam aktif hari ini dan 7 hari"]
+        ReportView["Analisis absensi bulanan / semester<br/>alpa berulang / ekspor CSV"]
+        AuditController["AdminAuditController"]
+        BackupController["DatabaseBackupController<br/>unduh SQL MySQL"]
     end
 
     subgraph Storage["Database relasional melalui Eloquent"]
@@ -58,6 +65,8 @@ flowchart LR
         AttendanceCorrections[("attendance_corrections")]
         ActivitySessions[("account_activity_sessions")]
         DailyActivity[("account_activity_daily")]
+        AuditLogs[("admin_audit_logs")]
+        Evidence["Penyimpanan privat bukti koreksi"]
     end
 
     Browser --> App
@@ -104,20 +113,32 @@ flowchart LR
     AdminController -->|cetak laporan| Journals
     AdminRoutes --> AttendanceController --> AttendanceViews --> Browser
     AttendanceController -->|filter tanggal / kelas / siswa / guru / status| Attendance
+    AttendanceController -->|persentase / alpa berulang / ekspor| ReportView
     AttendanceController -->|koreksi status dan keterangan| Attendance
     AttendanceController -->|catat admin, status lama/baru, alasan| AttendanceCorrections
+    AttendanceController -->|bukti wajib jika jurnal terverifikasi| Evidence
     AttendanceCorrections --> CorrectionAudit
     AttendanceCorrections --> Users
+    AdminRoutes --> StudentController --> StudentViews --> Browser
+    StudentController -->|pratinjau CSV lalu konfirmasi impor atomik| Students
+    AdminRoutes --> ClassController --> ClassViews --> Browser
+    ClassController -->|kelola wali / kelas dan promosi ke kelas kosong| Classes
+    ClassController -->|pindahkan roster aktif tanpa mengubah jurnal historis| Students
     AdminRoutes --> AccountController --> AccountViews --> Browser
     AccountController -->|buat / ubah / arsip akun| Users
     AccountController -->|ubah password| Users
     AccountController -->|baca aktivitas| ActivitySessions
     AccountController -->|rekap waktu aktif| DailyActivity
+    AdminRoutes --> AuditController -->|filter / tampilkan tindakan admin| AuditLogs
+    AdminRoutes --> BackupController -->|unduh backup SQL MySQL; pemulihan manual teknisi| Browser
 
     AuthControllers -->|mulai / akhiri sesi aktivitas| ActivitySessions
     GuruController -->|permintaan web terautentikasi| ActivitySessions
     ActivitySessions -->|akumulasi maksimal 15 menit idle| DailyActivity
     DailyActivity --> ActivityView
+    AdminController -->|catat verifikasi, perubahan akun/siswa, ekspor, dan backup| AuditLogs
+    AuditLogs -->|retensi terjadwal 14 hari| Cleanup["Scheduler 02:00"]
+    ActivitySessions -->|hapus detail sesi berakhir setelah 14 hari| Cleanup
 
     Students --> Classes
     Attendance --> Journals
@@ -135,7 +156,19 @@ flowchart LR
   peran admin dilakukan di controller; pengguna non-admin ditolak.
 - Admin membuka `/admin/absensi` untuk memfilter, mencetak rekap, dan melakukan
   koreksi absensi dengan alasan wajib. Riwayat menyimpan admin, nilai lama/baru,
-  keterangan, dan waktu koreksi.
+  keterangan, dan waktu koreksi. Koreksi jurnal terverifikasi memerlukan bukti
+  PDF/JPG/PNG yang disimpan privat. Analisis per bulan/semester menampilkan
+  persentase berdasarkan catatan yang ada, menandai minimal tiga alpa, dan dapat
+  diekspor ke CSV.
+- Admin mengelola roster di `/admin/students`: menambah, mengubah, memindahkan
+  kelas, mengimpor CSV setelah pratinjau dan konfirmasi, mengarsipkan, atau
+  mengaktifkan kembali siswa. Arsip menggunakan soft delete sehingga catatan
+  absensi tetap utuh; siswa yang diarsipkan tidak muncul di roster untuk jurnal
+  baru. NISN tetap unik dan tidak dapat dipakai ulang selama record arsip ada.
+- Admin mengelola wali kelas dan roster kelas di `/admin/classes`. Promosi
+  memindahkan semua siswa aktif ke kelas tujuan yang kosong sehingga jurnal
+  lama tetap terhubung ke kelas historis. Nama kelas yang sudah dipakai jurnal
+  tidak dapat diubah.
 - Route dashboard mengarahkan guru dan admin ke fitur masing-masing, sedangkan
   calon siswa dan peran lainnya melihat halaman dashboard.
 - Admin mengelola akun melalui `/admin/accounts`. Penghapusan akun menggunakan
@@ -143,5 +176,10 @@ flowchart LR
 - Sesi aktivitas mencatat login, aktivitas terakhir, logout, dan durasi aktif.
   Heartbeat dikirim saat halaman terlihat dan ada aktivitas pengguna; waktu idle
   dibatasi 15 menit dan durasi harian dipisah pada pergantian tanggal.
+- Audit tindakan admin dan detail sesi berakhir dihapus terjadwal setelah 14
+  hari; agregat `account_activity_daily` dan riwayat operasional jurnal/absensi
+  tidak termasuk retensi audit.
+- Admin dapat mengunduh backup SQL dari MySQL. Pemulihan sengaja tidak tersedia
+  melalui dashboard dan harus dijalankan manual oleh teknisi.
 - `siswas` terhubung ke kelas dan setiap catatan absensi memastikan hanya ada satu
   status siswa untuk jurnal yang sama.

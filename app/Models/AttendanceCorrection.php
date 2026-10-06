@@ -16,6 +16,7 @@ class AttendanceCorrection extends Model
         'keterangan_sebelumnya',
         'keterangan_baru',
         'alasan',
+        'evidence_path',
     ];
 
     public function attendance(): BelongsTo

@@ -21,7 +21,11 @@
                 <div class="navbar-nav ms-auto align-items-lg-center gap-lg-3">
                     <a class="nav-link" href="{{ route('admin.dashboard') }}">Monitoring jurnal</a>
                     <a class="nav-link active" href="{{ route('admin.absensi.index') }}">Rekap absensi</a>
+                    <a class="nav-link" href="{{ route('admin.students.index') }}">Kelola siswa</a>
+                    <a class="nav-link" href="{{ route('admin.classes.index') }}">Kelola kelas</a>
                     <a class="nav-link" href="{{ route('admin.accounts.index') }}">Kelola akun</a>
+                    <a class="nav-link" href="{{ route('admin.audit.index') }}">Audit</a>
+                    <a class="nav-link" href="{{ route('admin.backup.index') }}">Backup</a>
                     <form method="POST" action="{{ route('logout') }}" class="ms-lg-2">
                         @csrf
                         <button type="submit" class="btn btn-sm btn-outline-light rounded-pill px-3">Keluar</button>
@@ -38,8 +42,11 @@
                 <h1 class="portal-title h2 mb-2">Rekap absensi siswa</h1>
                 <p class="portal-muted mb-0">Pantau kehadiran per kelas, siswa, guru, dan rentang tanggal.</p>
             </div>
-            <a href="{{ route('admin.absensi.cetak', $filters) }}" target="_blank" rel="noopener"
-               class="btn portal-btn-primary rounded-pill px-4 py-2">Cetak laporan</a>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ route('admin.absensi.report') }}" class="btn portal-btn-outline rounded-pill px-4 py-2">Analisis bulanan / semester</a>
+                <a href="{{ route('admin.absensi.cetak', $filters) }}" target="_blank" rel="noopener"
+                   class="btn portal-btn-primary rounded-pill px-4 py-2">Cetak laporan</a>
+            </div>
         </header>
 
         @if(session('success'))
@@ -153,7 +160,7 @@
                                 <td style="min-width:250px">
                                     <details>
                                         <summary class="small fw-semibold text-success">Koreksi / riwayat ({{ $record->corrections->count() }})</summary>
-                                        <form action="{{ route('admin.absensi.correct', $record) }}" method="POST" class="portal-card shadow-none p-3 mt-2">
+                                        <form action="{{ route('admin.absensi.correct', $record) }}" method="POST" enctype="multipart/form-data" class="portal-card shadow-none p-3 mt-2">
                                             @csrf
                                             @method('PUT')
                                             <label class="form-label small fw-semibold" for="status-{{ $record->id }}">Status baru</label>
@@ -167,6 +174,13 @@
                                                    class="form-control form-control-sm mb-2" maxlength="255">
                                             <label class="form-label small fw-semibold" for="reason-{{ $record->id }}">Alasan koreksi</label>
                                             <textarea id="reason-{{ $record->id }}" name="alasan" class="form-control form-control-sm mb-2" rows="2" maxlength="1000" required></textarea>
+                                            @if($record->jurnal->status_monitoring === 'verified')
+                                                <label class="form-label small fw-semibold" for="evidence-{{ $record->id }}">Bukti koreksi (wajib setelah jurnal diverifikasi)</label>
+                                                <input id="evidence-{{ $record->id }}" name="bukti" type="file" accept=".pdf,.jpg,.jpeg,.png" class="form-control form-control-sm mb-2" required>
+                                            @else
+                                                <label class="form-label small fw-semibold" for="evidence-{{ $record->id }}">Bukti pendukung (opsional, PDF/JPG/PNG)</label>
+                                                <input id="evidence-{{ $record->id }}" name="bukti" type="file" accept=".pdf,.jpg,.jpeg,.png" class="form-control form-control-sm mb-2">
+                                            @endif
                                             <button type="submit" class="btn btn-sm portal-btn-primary rounded-pill px-3">Simpan koreksi</button>
                                         </form>
                                         @foreach($record->corrections as $correction)
@@ -174,6 +188,9 @@
                                                 {{ $correction->created_at->format('d/m/Y H:i') }} · {{ $correction->admin->name ?? $correction->admin_name }}<br>
                                                 {{ ucfirst($correction->status_sebelumnya) }} → {{ ucfirst($correction->status_baru) }}<br>
                                                 <span class="portal-muted">{{ $correction->alasan }}</span>
+                                                @if($correction->evidence_path)
+                                                    <br><a href="{{ route('admin.absensi.evidence', $correction) }}">Unduh bukti</a>
+                                                @endif
                                             </div>
                                         @endforeach
                                     </details>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\JurnalGuru;
+use App\Services\AdminAuditLogger;
 use Illuminate\Http\Request;
 
 class AdminJurnalController extends Controller
@@ -37,22 +38,25 @@ class AdminJurnalController extends Controller
     }
 
     // Fitur Evaluasi (Verifikasi Jurnal)
-    public function verify($id)
+    public function verify(Request $request, $id, AdminAuditLogger $auditLogger)
     {
         $jurnal = JurnalGuru::findOrFail($id);
         $jurnal->update(['status_monitoring' => 'verified']);
+        $auditLogger->record($request->user(), 'journal.verified', "Jurnal #{$jurnal->id} diverifikasi.", $jurnal);
 
         return redirect()->back()->with('success', 'Jurnal mengajar berhasil diverifikasi.');
     }
 
     // Fitur Pengarsipan (Cetak Laporan)
-    public function cetak(Request $request)
+    public function cetak(Request $request, AdminAuditLogger $auditLogger)
     {
+        $filters = $request->validate(['bulan' => ['nullable', 'integer', 'between:1,12']]);
+        $auditLogger->record($request->user(), 'journal.report_printed', 'Rekap jurnal dicetak.', null, $filters);
         $query = JurnalGuru::with(['user', 'kelas', 'mataPelajaran', 'absensi'])->orderBy('tanggal', 'asc');
 
-        if ($request->filled('bulan')) {
-            $query->whereMonth('tanggal', $request->bulan);
-            $namaBulan = date('F', mktime(0, 0, 0, $request->bulan, 10));
+        if (isset($filters['bulan'])) {
+            $query->whereMonth('tanggal', $filters['bulan']);
+            $namaBulan = date('F', mktime(0, 0, 0, $filters['bulan'], 10));
         } else {
             $namaBulan = 'Semua Bulan';
         }

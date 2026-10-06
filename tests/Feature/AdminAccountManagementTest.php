@@ -64,6 +64,19 @@ class AdminAccountManagementTest extends TestCase
         ])->assertRedirect(route('admin.accounts.index'));
 
         $this->assertTrue(Hash::check('password-reset-123', $account->refresh()->password));
+        $this->assertDatabaseHas('admin_audit_logs', [
+            'action' => 'account.created',
+            'subject_id' => (string) $account->id,
+        ]);
+        $this->assertDatabaseHas('admin_audit_logs', [
+            'action' => 'account.updated',
+            'subject_id' => (string) $account->id,
+        ]);
+        $this->assertDatabaseHas('admin_audit_logs', [
+            'action' => 'account.password_changed',
+            'subject_id' => (string) $account->id,
+            'metadata' => null,
+        ]);
     }
 
     public function test_admin_can_monitor_online_status_and_active_time(): void

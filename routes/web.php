@@ -7,6 +7,10 @@ use App\Http\Controllers\Guru\JurnalGuruController;
 use App\Http\Controllers\Admin\AdminJurnalController;
 use App\Http\Controllers\Admin\AccountManagementController;
 use App\Http\Controllers\Admin\AdminAttendanceController;
+use App\Http\Controllers\Admin\StudentManagementController;
+use App\Http\Controllers\Admin\ClassManagementController;
+use App\Http\Controllers\Admin\AdminAuditController;
+use App\Http\Controllers\Admin\DatabaseBackupController;
 
 // 1. Halaman Utama (Website Sekolah)
 Route::get('/', function () {
@@ -56,7 +60,10 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
 
         Route::get('/absensi', [AdminAttendanceController::class, 'index'])->name('absensi.index');
         Route::get('/absensi/cetak', [AdminAttendanceController::class, 'cetak'])->name('absensi.cetak');
+        Route::get('/absensi/laporan', [AdminAttendanceController::class, 'report'])->name('absensi.report');
+        Route::get('/absensi/laporan.csv', [AdminAttendanceController::class, 'exportReport'])->name('absensi.report.export');
         Route::put('/absensi/{attendance}/koreksi', [AdminAttendanceController::class, 'correct'])->name('absensi.correct');
+        Route::get('/absensi/bukti/{correction}', [AdminAttendanceController::class, 'evidence'])->name('absensi.evidence');
 
         Route::get('/accounts', [AccountManagementController::class, 'index'])->name('accounts.index');
         Route::get('/accounts/create', [AccountManagementController::class, 'create'])->name('accounts.create');
@@ -66,6 +73,27 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         Route::get('/accounts/{user}/password', [AccountManagementController::class, 'editPassword'])->name('accounts.password.edit');
         Route::put('/accounts/{user}/password', [AccountManagementController::class, 'updatePassword'])->name('accounts.password.update');
         Route::delete('/accounts/{user}', [AccountManagementController::class, 'destroy'])->name('accounts.destroy');
+
+        Route::get('/students', [StudentManagementController::class, 'index'])->name('students.index');
+        Route::get('/students/create', [StudentManagementController::class, 'create'])->name('students.create');
+        Route::post('/students', [StudentManagementController::class, 'store'])->name('students.store');
+        Route::get('/students/import-template', [StudentManagementController::class, 'template'])->name('students.template');
+        Route::post('/students/import', [StudentManagementController::class, 'import'])->name('students.import');
+        Route::post('/students/import/confirm', [StudentManagementController::class, 'confirmImport'])->name('students.import.confirm');
+        Route::get('/students/{student}/edit', [StudentManagementController::class, 'edit'])->name('students.edit');
+        Route::put('/students/{student}', [StudentManagementController::class, 'update'])->name('students.update');
+        Route::delete('/students/{student}', [StudentManagementController::class, 'archive'])->name('students.archive');
+        Route::post('/students/{studentId}/restore', [StudentManagementController::class, 'restore'])->name('students.restore');
+
+        Route::get('/classes', [ClassManagementController::class, 'index'])->name('classes.index');
+        Route::post('/classes', [ClassManagementController::class, 'store'])->name('classes.store');
+        Route::put('/classes/{class}', [ClassManagementController::class, 'update'])->name('classes.update');
+        Route::post('/classes/promote', [ClassManagementController::class, 'promote'])->name('classes.promote');
+
+        Route::get('/audit', [AdminAuditController::class, 'index'])->name('audit.index');
+        Route::get('/backup', fn () => view('admin.backup.index'))->name('backup.index');
+        Route::get('/backup/download', [DatabaseBackupController::class, 'download'])->name('backup.download');
+
     });
 });
 

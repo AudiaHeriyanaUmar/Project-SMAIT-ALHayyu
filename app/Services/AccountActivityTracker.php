@@ -75,6 +75,56 @@ class AccountActivityTracker
         }
     }
 
+    public function expireIdleSessions(): int
+    {
+        $cutoff = CarbonImmutable::now()->subMinutes(self::IDLE_TIMEOUT_MINUTES);
+        $sessionIds = AccountActivitySession::query()
+            ->whereNull('ended_at')
+            ->where('last_activity_at', '<=', $cutoff)
+            ->pluck('id');
+        $expired = 0;
+
+        foreach ($sessionIds as $sessionId) {
+            $wasExpired = DB::transaction(function () use ($sessionId, $cutoff): bool {
+                $sessionCandidate = AccountActivitySession::query()->find($sessionId);
+
+                if (! $sessionCandidate) {
+                    return false;
+                }
+
+                User::withTrashed()->whereKey($sessionCandidate->user_id)->lockForUpdate()->firstOrFail();
+                $session = AccountActivitySession::query()
+                    ->whereKey($sessionId)
+                    ->whereNull('ended_at')
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $session) {
+                    return false;
+                }
+
+                $lastActivity = CarbonImmutable::parse($session->last_activity_at);
+
+                if ($lastActivity->greaterThan($cutoff)) {
+                    return false;
+                }
+
+                $endedAt = $lastActivity->addMinutes(self::IDLE_TIMEOUT_MINUTES);
+                $this->addActiveTime($session, $lastActivity, $endedAt);
+                $session->update([
+                    'last_activity_at' => $endedAt,
+                    'ended_at' => $endedAt,
+                ]);
+
+                return true;
+            });
+
+            $expired += (int) $wasExpired;
+        }
+
+        return $expired;
+    }
+
     private function recordSessionHash(User $user, string $sessionHash, CarbonImmutable $now): void
     {
         DB::transaction(function () use ($user, $sessionHash, $now): void {

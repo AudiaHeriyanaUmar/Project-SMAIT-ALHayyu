@@ -109,6 +109,22 @@ class GuruJournalAttendanceTest extends TestCase
         $this->assertDatabaseCount('jurnal_gurus', 0);
     }
 
+    public function test_archived_students_are_not_in_the_roster_for_new_journals(): void
+    {
+        [$guru, $classId, , $studentIds] = $this->createClassRoster();
+        DB::table('siswas')->where('id', $studentIds[1])->update(['deleted_at' => now()]);
+
+        $this->actingAs($guru)
+            ->get(route('guru.jurnal.create'))
+            ->assertOk()
+            ->assertSee('Siswa Satu')
+            ->assertDontSee('Siswa Dua')
+            ->assertSee('name="absensi['.$studentIds[0].'][status]"', false)
+            ->assertDontSee('name="absensi['.$studentIds[1].'][status]"', false);
+
+        $this->assertSame(1, DB::table('siswas')->where('kelas_id', $classId)->whereNull('deleted_at')->count());
+    }
+
     private function createClassRoster(): array
     {
         $guru = User::factory()->create(['role' => 'guru']);
